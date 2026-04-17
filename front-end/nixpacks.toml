@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["nodejs_18"]
+
+[phases.build]
+cmds = ["cd front-end && npm install && npm run build"]
+
+[start]
+cmd = "cd front-end && npx serve -s build -l $PORT"
