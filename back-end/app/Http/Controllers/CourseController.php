@@ -11,15 +11,19 @@ class CourseController extends Controller
     public function embed(Request $request)
     {
         $dati = $request->validate([
-            'id' => 'required|string',
-            'title' => 'required|string',
-            'description' => 'required|string',
-            'skills' => 'required|array',
-            'duration' => 'required|string',
-            'remote' => 'required|boolean',
+            'id' => 'required',
+            'title' => 'required',
+            'description' => 'required',
+            'skills' => 'required',
+            'duration' => 'required',
+            'remote' => 'required',
         ]);
 
-        $testoPerEmbedding = $dati['title'] . ". " . $dati['description'] . " Skills: " . implode(', ', $dati['skills']) . ". Durata: " . $dati['duration'];
+        $testo1 = $dati['title'] . ". " . $dati['description'];
+        $testo2 = " Skills: " . implode(', ', $dati['skills']);
+        $testo3 = ". Durata: " . $dati['duration'];
+        
+        $testoPerEmbedding = $testo1 . $testo2 . $testo3;
 
         $chiaveOpenAI = config('services.openai.key');
         
@@ -28,7 +32,10 @@ class CourseController extends Controller
             'input' => $testoPerEmbedding,
         ]);
 
-        $vettore = $rispostaEmbedding->json('data.0.embedding');
+        $ArrayRisposta = $rispostaEmbedding->json();
+        $vettore = $ArrayRisposta['data'][0]['embedding'];
+        
+        $competenzeUnite = implode(', ', $dati['skills']);
 
         $corso = Course::updateOrCreate(
             ['id' => $dati['id']],
@@ -36,7 +43,7 @@ class CourseController extends Controller
                 'vector' => $vettore,
                 'title' => $dati['title'],
                 'description' => $dati['description'],
-                'skills' => implode(', ', $dati['skills']),
+                'skills' => $competenzeUnite,
                 'duration' => $dati['duration'],
                 'remote' => $dati['remote'],
             ]
@@ -45,7 +52,7 @@ class CourseController extends Controller
         return response()->json(['status' => 'success', 'id' => $corso->id]);
     }
 
-    public function semanticSearch(string $testoCercato, int $quanti = 2)
+    public function semanticSearch($testoCercato, $quantiCorsi = 2)
     {
         $chiaveOpenAI = config('services.openai.key');
 
@@ -54,7 +61,8 @@ class CourseController extends Controller
             'input' => $testoCercato,
         ]);
 
-        $vettoreQuery = $rispostaEmbedding->json('data.0.embedding');
+        $ArrayRisposta = $rispostaEmbedding->json();
+        $vettoreQuery = $ArrayRisposta['data'][0]['embedding'];
 
         $tuttiICorsi = Course::all();
         $risultatiConPunteggio = [];
@@ -62,44 +70,74 @@ class CourseController extends Controller
         foreach ($tuttiICorsi as $corso) {
             $vettoreCorso = $corso->vector;
             
+            if (!is_array($vettoreCorso)) {
+                $vettoreCorso = json_decode($vettoreCorso, true);
+            }
+            
             $prodottoScalare = 0;
             $normaA = 0;
             $normaB = 0;
 
-            foreach ($vettoreQuery as $i => $valore) {
-                $prodottoScalare += $valore * $vettoreCorso[$i];
-                $normaA += $valore * $valore;
-                $normaB += $vettoreCorso[$i] * $vettoreCorso[$i];
+            $lunghezzaVettore = count($vettoreQuery);
+
+            for ($i = 0; $i < $lunghezzaVettore; $i++) {
+                $valoreQuery = $vettoreQuery[$i];
+                $valoreCorso = $vettoreCorso[$i];
+                
+                $prodottoScalare = $prodottoScalare + ($valoreQuery * $valoreCorso);
+                $normaA = $normaA + ($valoreQuery * $valoreQuery);
+                $normaB = $normaB + ($valoreCorso * $valoreCorso);
             }
 
             if ($normaA > 0 && $normaB > 0) {
-                $similitudine = $prodottoScalare / (sqrt($normaA) * sqrt($normaB));
+                $radiceA = sqrt($normaA);
+                $radiceB = sqrt($normaB);
+                $similitudine = $prodottoScalare / ($radiceA * $radiceB);
             } else {
                 $similitudine = 0;
             }
 
-            $risultatiConPunteggio[] = [
+            $elemento = [
                 'punteggio' => $similitudine,
                 'corso' => $corso
             ];
+            
+            array_push($risultatiConPunteggio, $elemento);
         }
 
         usort($risultatiConPunteggio, function($a, $b) {
-            return $b['punteggio'] <=> $a['punteggio'];
+            if ($a['punteggio'] == $b['punteggio']) {
+                return 0;
+            }
+            if ($a['punteggio'] < $b['punteggio']) {
+                return 1;
+            } else {
+                return -1;
+            }
         });
 
-        $topCorsi = array_slice($risultatiConPunteggio, 0, $quanti);
+        $topCorsi = array_slice($risultatiConPunteggio, 0, $quantiCorsi);
         
         $rispostaFinale = [];
+        
         foreach ($topCorsi as $item) {
             $c = $item['corso'];
-            $rispostaFinale[] = [
+            
+            if ($c->remote == true) {
+                $testoRemoto = 'Sì';
+            } else {
+                $testoRemoto = 'No';
+            }
+            
+            $corsoTrovato = [
                 'title' => $c->title,
                 'description' => $c->description,
                 'duration' => $c->duration,
                 'skills' => $c->skills,
-                'remote' => $c->remote ? 'Sì' : 'No'
+                'remote' => $testoRemoto
             ];
+            
+            array_push($rispostaFinale, $corsoTrovato);
         }
 
         return $rispostaFinale;

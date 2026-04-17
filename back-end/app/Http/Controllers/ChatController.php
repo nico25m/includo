@@ -11,8 +11,8 @@ class ChatController extends Controller
     public function chat(Request $request)
     {
         $datiRequest = $request->validate([
-            'session_id' => 'required|string',
-            'message' => 'required|string',
+            'session_id' => 'required',
+            'message' => 'required',
         ]);
 
         $sid = $datiRequest['session_id'];
@@ -25,53 +25,59 @@ class ChatController extends Controller
         ]);
 
         $messaggiPerOpenAI = [];
-        $messaggiPerOpenAI[] = [
+        
+        $messaggioDiSistema = [
             'role' => 'system',
             'content' => "Sei Indo, l'assistente di IncluDO. Aiuti persone in difficoltà a trovare corsi artigianali. Fai una domanda alla volta. Chiedi interessi, tempo disponibile e se preferiscono remoto o presenza. Solo dopo 3 o 4 messaggi, usa searchCourses per trovare i corsi."
         ];
+        array_push($messaggiPerOpenAI, $messaggioDiSistema);
 
-        $storicoDB = Conversation::where('session_id', $sid)->orderBy('created_at')->get();
+        $storicoDB = Conversation::where('session_id', $sid)->orderBy('created_at', 'asc')->get();
 
         foreach ($storicoDB as $riga) {
             if ($riga->role == 'tool') {
-                $messaggiPerOpenAI[] = [
+                $messaggioTool = [
                     'role' => 'tool',
                     'tool_call_id' => $riga->tool_call_id,
                     'content' => $riga->content
                 ];
+                array_push($messaggiPerOpenAI, $messaggioTool);
             } else if ($riga->role == 'assistant' && $riga->tool_name == 'searchCourses') {
-                $messaggiPerOpenAI[] = [
+                $messaggioChiamata = [
                     'role' => 'assistant',
                     'content' => null,
                     'tool_calls' => json_decode($riga->content, true)
                 ];
+                array_push($messaggiPerOpenAI, $messaggioChiamata);
             } else {
-                $messaggiPerOpenAI[] = [
+                $messaggioNormale = [
                     'role' => $riga->role,
                     'content' => $riga->content
                 ];
+                array_push($messaggiPerOpenAI, $messaggioNormale);
             }
         }
 
-        $strumenti = [
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'searchCourses',
-                    'description' => 'Cerca i corsi artigianali nel database di IncluDO.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'query' => [
-                                'type' => 'string',
-                                'description' => 'Testo della ricerca basato sulle preferenze utente.'
-                            ]
-                        ],
-                        'required' => ['query']
-                    ]
+        $strumentoRicerca = [
+            'type' => 'function',
+            'function' => [
+                'name' => 'searchCourses',
+                'description' => 'Cerca i corsi artigianali nel database di IncluDO.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'query' => [
+                            'type' => 'string',
+                            'description' => 'Testo della ricerca basato sulle preferenze utente.'
+                        ]
+                    ],
+                    'required' => ['query']
                 ]
             ]
         ];
+
+        $strumenti = [];
+        array_push($strumenti, $strumentoRicerca);
 
         $chiaveOpenAI = config('services.openai.key');
 
@@ -82,12 +88,15 @@ class ChatController extends Controller
             'tool_choice' => 'auto'
         ]);
 
-        $risultatoOpenAI = $risposta->json('choices.0.message');
+        $rispostaArray = $risposta->json();
+        $risultatoOpenAI = $rispostaArray['choices'][0]['message'];
 
-        if (isset($risultatoOpenAI['tool_calls'])) {
+        if (array_key_exists('tool_calls', $risultatoOpenAI)) {
             $chiamataTool = $risultatoOpenAI['tool_calls'][0];
             $idChiamata = $chiamataTool['id'];
-            $argomenti = json_decode($chiamataTool['function']['arguments'], true);
+            
+            $argomentiStringa = $chiamataTool['function']['arguments'];
+            $argomenti = json_decode($argomentiStringa, true);
             $testoCerca = $argomenti['query'];
 
             Conversation::create([
@@ -109,19 +118,22 @@ class ChatController extends Controller
                 'tool_name' => 'searchCourses'
             ]);
 
-            $messaggiPerOpenAI[] = $risultatoOpenAI;
-            $messaggiPerOpenAI[] = [
+            array_push($messaggiPerOpenAI, $risultatoOpenAI);
+            
+            $messaggioRitornoTool = [
                 'role' => 'tool',
                 'tool_call_id' => $idChiamata,
                 'content' => json_encode($risultatiRAG)
             ];
+            array_push($messaggiPerOpenAI, $messaggioRitornoTool);
 
             $rispostaFinaleOb = Http::withToken($chiaveOpenAI)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => 'gpt-4o-mini',
                 'messages' => $messaggiPerOpenAI
             ]);
 
-            $testoFinale = $rispostaFinaleOb->json('choices.0.message.content');
+            $arrayFinale = $rispostaFinaleOb->json();
+            $testoFinale = $arrayFinale['choices'][0]['message']['content'];
 
             Conversation::create([
                 'session_id' => $sid,

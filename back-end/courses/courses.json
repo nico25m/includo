@@ -21,7 +21,7 @@
     "description": "Lavorazione dell'argilla al tornio e a mano. Si impara a modellare il materiale, decorarlo e cuocerlo nel forno.",
     "skills": ["argilla", "modellazione", "decorazione"],
     "duration": "4 mesi",
-    "remote": false
+    "remote": true
   },
   {
     "id": "pelle",

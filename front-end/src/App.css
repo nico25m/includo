@@ -1,13 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap");
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-  font-family: 'Outfit', sans-serif;
+  font-family: "Outfit", sans-serif;
   background: radial-gradient(circle at top left, #1e293b, #0f172a, #020617);
   background-attachment: fixed;
   color: #f8fafc;
@@ -21,31 +22,36 @@ html, body {
   width: 100%;
   display: flex;
   justify-content: center;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 .container-chat {
   width: 100%;
+  max-width: none;
   height: 100%;
-  background: rgba(30, 41, 59, 0.7);
+  background: rgba(30, 41, 59, 0.85);
   display: flex;
   flex-direction: column;
   border: none;
   border-radius: 0;
+  overflow: hidden;
+  box-shadow:
+    0 8px 32px 0 rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(56, 189, 248, 0.05);
 }
 
 .titolo-app {
   padding: 16px 20px;
   background: rgba(255, 255, 255, 0.1);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0;
 }
 
 .titolo-app h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   color: #38bdf8;
+  letter-spacing: -0.5px;
 }
 
 .titolo-app p {
@@ -61,6 +67,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 .riga-messaggio {
@@ -95,14 +103,15 @@ html, body {
 }
 
 .fumetto.user {
-  background: #0284c7;
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
   color: white;
   border-top-right-radius: 4px;
+  box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
 }
 
 .fumetto.assistant {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f1f5f9;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-top-left-radius: 4px;
 }
@@ -117,23 +126,45 @@ html, body {
 
 .area-invio input {
   flex: 1;
-  padding: 12px 18px;
-  background: rgba(0, 0, 0, 0.3);
+  padding: 14px 20px;
+  background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   color: white;
   font-size: 16px;
   outline: none;
+  transition: all 0.3s ease;
+}
+
+.area-invio input:focus {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+  background: rgba(15, 23, 42, 0.8);
 }
 
 .area-invio button {
-  padding: 0 20px;
-  background: #f8fafc;
+  padding: 0 24px;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
   color: #0f172a;
   border: none;
   border-radius: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.area-invio button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+}
+
+.area-invio button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.area-invio button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .loading {
@@ -142,7 +173,7 @@ html, body {
   font-size: 14px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1000px) {
   #root {
     align-items: center;
     padding: 20px;
@@ -187,8 +218,3 @@ html, body {
     padding: 24px 40px;
   }
 }
-
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
